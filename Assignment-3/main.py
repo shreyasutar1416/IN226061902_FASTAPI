@@ -1,0 +1,134 @@
+from fastapi import FastAPI, HTTPException, Query, Response
+from typing import List, Optional
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+
+products = [
+
+    {'id': 1, 'name': 'Wireless Mouse', 'price': 499,  'category': 'Electronics', 'in_stock': True },
+    {'id': 2, 'name': 'Notebook', 'price':  99,  'category': 'Stationery',  'in_stock': True },
+    {'id': 3, 'name': 'USB Hub', 'price': 799, 'category': 'Electronics', 'in_stock': False},
+    {'id': 4, 'name': 'Pen Set', 'price':  49, 'category': 'Stationery',  'in_stock': True }
+]
+
+# ── Endpoint 0 — Home ────────────────────────────────────────
+
+@app.get('/')
+
+def home():
+
+    return {'message': 'Welcome to our E-commerce API'}
+
+
+# ── Endpoint 1 — Return all products ──────────────────────────
+
+@app.get('/products')
+
+def get_all_products():
+
+    return {'products': products, 'total': len(products)}
+
+# ── Endpoint 2 — Add a new product ──────────────────
+# Question 1
+
+@app.post("/products")
+def add_product(product: dict):
+
+    for p in products:
+        if p["name"].lower() == product["name"].lower():
+            raise HTTPException(status_code=400, detail="Product already exists")
+
+    new_id = max(p["id"] for p in products) + 1
+    product["id"] = new_id
+
+    products.append(product)
+
+    return {
+        "message": "Product added",
+        "product": product
+    }
+
+# ── Endpoint 3 — Bulk discount by category ──────────────────────────
+# Bonus
+
+@app.put('/products/discount') 
+def bulk_discount( category: str = Query(..., description='Category to discount'), discount_percent: int = Query(..., ge=1, le=99, description='% off'), ): 
+    updated = [] 
+    
+    for p in products: 
+        if p['category'] == category: 
+            p['price'] = int(p['price'] * (1 - discount_percent / 100)) 
+            updated.append(p) 
+    
+    if not updated: 
+            return {'message': f'No products found in category: {category}'} 
+    
+    return { 'message': f'{discount_percent}% discount applied to {category}', 'updated_count': len(updated), 'updated_products': updated, }
+
+# ── Endpoint 4 — Product audit ──────────────────────────
+# Question 5
+
+@app.get('/products/audit') 
+def product_audit(): 
+    in_stock_list = [p for p in products if p['in_stock']] 
+
+    out_stock_list = [p for p in products if not p['in_stock']] 
+
+    stock_value = sum(p['price'] * 10 for p in in_stock_list) 
+    priciest = max(products, key=lambda p: p['price']) 
+
+    return {'total_products': len(products), 
+            'in_stock_count': len(in_stock_list), 
+            'out_of_stock_names': [p['name'] for p in out_stock_list], 
+            'total_stock_value': stock_value, 
+            'most_expensive': {'name': priciest['name'], 
+                               'price': priciest['price']}, }
+
+# ── Endpoint 5 — Return a product by ID ──────────────────────────
+
+@app.get('/products/{product_id}')
+
+def get_product(product_id: int):
+
+    for product in products:
+        if product['id'] == product_id:
+            return {'product': product}
+        
+    return {'error': 'Product not found'}
+
+# ── Endpoint 6 — Update a product's price and stock status ──────────────────────────
+# Question 2
+
+@app.put("/products/{product_id}")
+def update_product(product_id: int, price: Optional[int] = None, in_stock: Optional[bool] = None):
+
+    for product in products:
+        if product["id"] == product_id:
+
+            if price is not None:
+                product["price"] = price
+
+            if in_stock is not None:
+                product["in_stock"] = in_stock
+
+            return {
+                "message": "Product updated",
+                "product": product
+            }
+
+    raise HTTPException(status_code=404, detail="Product not found")
+
+# ── Endpoint 7 — Delete a product by ID ──────────────────────────
+# Question 3
+
+@app.delete('/products/{product_id}') 
+def delete_product(product_id: int, response: Response): 
+    product = get_product(product_id)
+
+    if 'error' in product:
+        response.status_code = 404
+        return {'error': 'Product not found'}
+    
+    products.remove(product['product'])
+    return {'message': f"Product '{product['product']['name']}' deleted"}
