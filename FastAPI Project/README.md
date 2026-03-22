@@ -182,5 +182,5 @@ This project demonstrates:
 ---
 
 ## Author
-
+Shreya Sutar
 MediCare Clinic FastAPI Project
